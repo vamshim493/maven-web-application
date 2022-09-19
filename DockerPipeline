@@ -1,0 +1,38 @@
+node {
+
+  def buildNumber = BUILD_NUMBER
+  
+    stage ('checkout code') {
+    git 'https://github.com/vamshim493/maven-web-application.git'
+    }
+
+    stage ('maven build package'){
+    
+         sh "mvn clean package"
+    }
+     
+     stage ("Build docker image"){
+         
+         sh "docker build -t vamshidocker493/maven-web-application-docker:${buildNumber} ."
+     }
+     
+     stage ("Docker login and Push image to repoistory") {
+         
+     withCredentials([string(credentialsId: 'Docker_hub_pwd', variable: 'Docker_hub_pwd')]) {
+     
+      sh "docker login -u vamshidocker493 -p ${Docker_hub_pwd}" 
+     }
+      sh "docker push vamshidocker493/maven-web-application-docker:${buildNumber}"
+     }
+     
+     stage ("Deploy application as docker container"){
+         
+         sshagent(['Docker_server_SSH']) {
+         
+        sh "ssh -o StrictHostKeyChecking=no ubuntu@172.31.16.239 docker rm -f mavenwebappcontainer || true" 
+         
+        
+        sh "ssh -o StrictHostKeyChecking=no ubuntu@172.31.16.239 docker run -d -p 8080:8080 --name mavenwebappcontainer vamshidocker493/maven-web-application-docker:${buildNumber}"
+     }
+     }
+}
